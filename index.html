@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ATR 72-600 load planner</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>ATR 72-600 load planner</h1>
+
+      <section>
+        <label for="ofpText">Paste the SimBrief OFP</label>
+        <textarea
+          id="ofpText"
+          rows="6"
+          spellcheck="false"
+          placeholder="Paste the full OFP text"
+        ></textarea>
+        <div class="actions">
+          <button onclick="parseOFP()">Generate load</button>
+        </div>
+        <div id="statusBox" class="status" hidden></div>
+      </section>
+
+      <section id="flightCard" hidden>
+        <div id="flightStrip" class="flight"></div>
+      </section>
+
+      <section id="efbCard" hidden>
+        <table id="efbRows"></table>
+
+        <details>
+          <summary>CG verification <span id="cgSummary"></span></summary>
+
+          <table>
+            <tr>
+              <td>CG</td>
+              <td id="cgPercent">-</td>
+            </tr>
+            <tr>
+              <td>Pitch trim</td>
+              <td id="cgTrim">-</td>
+            </tr>
+            <tr>
+              <td>Status</td>
+              <td id="cgStatus">-</td>
+            </tr>
+          </table>
+
+          <div class="bar">
+            <i id="macOk"></i>
+            <b id="macPointer"></b>
+          </div>
+
+          <div class="actions">
+            <a
+              href="#"
+              onclick="
+                copyAll();
+                return false;
+              "
+              >Copy all</a
+            >
+          </div>
+        </details>
+
+        <div class="actions">
+          <button onclick="regenerate()">Regenerate</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

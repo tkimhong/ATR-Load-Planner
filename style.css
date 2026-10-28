@@ -1,0 +1,188 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 32px 20px 64px;
+  background: #fff;
+  color: #111;
+  font:
+    14px/1.6 system-ui,
+    sans-serif;
+}
+
+main {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e5e5;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+textarea::placeholder {
+  color: #aaa;
+}
+
+textarea:focus {
+  outline: 2px solid #111;
+  outline-offset: -1px;
+}
+
+button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  background: #111;
+  color: #fff;
+  font:
+    500 13px system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #333;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.actions a {
+  font-size: 13px;
+  color: #666;
+}
+
+.status {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.ok {
+  color: #067a48;
+}
+
+.bad {
+  color: #ad1f1f;
+}
+
+.flight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #444;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+details {
+  margin-top: 20px;
+}
+
+summary {
+  font-size: 12px;
+  color: #666;
+  cursor: pointer;
+}
+
+summary span {
+  color: #111;
+}
+
+details table {
+  margin-top: 8px;
+}
+
+details .bar {
+  margin-top: 10px;
+}
+
+td {
+  padding: 4px 0;
+}
+
+td + td {
+  text-align: right;
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+tr.head td {
+  padding-top: 20px;
+  font-family: inherit;
+  font-size: 11px;
+  color: #999;
+}
+
+tr.head:first-child td {
+  padding-top: 0;
+}
+
+#cgPercent,
+#cgTrim {
+  font-size: 15px;
+}
+
+.bar {
+  position: relative;
+  height: 6px;
+  margin: 14px 0 0;
+  background: #eee;
+}
+
+.bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: #d7f0e2;
+}
+
+.bar b {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 14px;
+  background: #111;
+}
+
+[hidden] {
+  display: none !important;
+}
