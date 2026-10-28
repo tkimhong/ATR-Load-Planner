@@ -1,30 +1,29 @@
-const ADULT_KG = 185 * 0.453592;
+const ADULT_KG = 84;
 const CHILD_KG = 35;
 const ZONE_RATIO = { A: 0.27, B: 0.44, C: 0.29 };
 
 const COMPS = [
-  { name: "Fwd Right", max: 288 },
-  { name: "Fwd Left", max: 448 },
-  { name: "Rear Fwd R", max: 302 },
-  { name: "Rear Aft R", max: 466 },
+  { name: "Fwd Right", max: 288, arm: 6.662 },
+  { name: "Fwd Left", max: 448, arm: 6.662 },
+  { name: "Rear Fwd R", max: 302, arm: 23.181 },
+  { name: "Rear Aft R", max: 466, arm: 24.318 },
 ];
 
 const LEMAC = 13.604;
 const MAC = 2.303;
 
 const ARM = {
-  OEW: 13.7,
-  ZONE_A: 13.1,
-  ZONE_B: 15.35,
-  ZONE_C: 17.5,
-  FWD_COMPT: 9.2,
-  AFT_COMPT: 19.8,
+  OEW: 14.237,
+  ZONE_A: 8.95,
+  ZONE_B: 13.821,
+  ZONE_C: 19.153,
+  FUEL: 14.516,
 };
 
-const OEW_KG = 13189;
+const OEW_KG = 14000;
 
 const CG_MIN = 20.0;
-const CG_MAX = 25.0;
+const CG_MAX = 31.0;
 const MAX_ATTEMPTS = 50;
 
 const $ = (id) => document.getElementById(id);
@@ -97,24 +96,29 @@ function renderFlight() {
 }
 
 function calcCG(dist) {
-  const { zones, cargo } = dist;
+  const { zones, cargo, fuel } = dist;
 
   const paxA = zones.A.adults * ADULT_KG + zones.A.children * CHILD_KG;
   const paxB = zones.B.adults * ADULT_KG;
   const paxC = zones.C.adults * ADULT_KG;
 
-  const fwd = cargo[0] + cargo[1];
-  const aft = cargo[2] + cargo[3];
+  const ramp = Math.max(0, fuel.block - 50);
 
-  const total = OEW_KG + paxA + paxB + paxC + fwd + aft;
+  const total =
+    OEW_KG +
+    paxA +
+    paxB +
+    paxC +
+    ramp +
+    cargo.reduce((sum, kg) => sum + kg, 0);
 
   const moment =
     OEW_KG * ARM.OEW +
     paxA * ARM.ZONE_A +
     paxB * ARM.ZONE_B +
     paxC * ARM.ZONE_C +
-    fwd * ARM.FWD_COMPT +
-    aft * ARM.AFT_COMPT;
+    ramp * ARM.FUEL +
+    cargo.reduce((sum, kg, i) => sum + kg * COMPS[i].arm, 0);
 
   const pct = ((moment / total - LEMAC) / MAC) * 100;
 
@@ -122,9 +126,7 @@ function calcCG(dist) {
 }
 
 function macToTrim(pctMAC) {
-  const raw = 2.5 - (pctMAC - 15) * (2.5 / 20);
-  const clamped = Math.max(0, Math.min(2.5, raw));
-  return Math.round(clamped * 4) / 4;
+  return Math.round((4.0133 - 0.10835 * pctMAC) * 100) / 100;
 }
 
 function distribute() {
@@ -217,7 +219,7 @@ function renderEFB() {
 
   $("cgPercent").textContent = cg.pctMAC.toFixed(1) + "% MAC";
   $("cgPercent").className = inLimits ? "ok" : "bad";
-  $("cgTrim").textContent = trim === 0 ? "UP" : trim.toFixed(2);
+  $("cgTrim").textContent = trim.toFixed(2);
   $("cgStatus").textContent = inLimits ? "in limits" : "out of limits";
   $("cgStatus").className = inLimits ? "ok" : "bad";
   $("cgSummary").textContent = `${cg.pctMAC.toFixed(1)}% MAC, ${
@@ -290,7 +292,7 @@ function copyAll() {
     ...COMPS.map((c, i) => `${c.name}: ${cargo[i]} kg`),
     "",
     `CG: ${cg.pctMAC.toFixed(1)}% MAC`,
-    `PITCH TRIM: ${trim === 0 ? "UP" : trim.toFixed(2)}`,
+    `PITCH TRIM: ${trim.toFixed(2)}`,
   ].join("\n");
 
   try {
