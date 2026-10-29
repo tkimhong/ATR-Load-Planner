@@ -6,6 +6,8 @@ Just a temporary solution for automating the load instructions.
 
 Live at [tkimhong.github.io/ATR-Load-Planner](https://tkimhong.github.io/ATR-Load-Planner/).
 
+<img width="449" height="906" alt="The load planner with a generated load" src="https://github.com/user-attachments/assets/13463a88-bdba-4ec0-a5b0-56fa583e661f" />
+
 ## How to use
 
 1. Enter your SimBrief user ID and press **Generate load** (it is remembered after the first time).
@@ -26,6 +28,6 @@ With a different aircraft the arms need re-measuring; these are available in the
 
 ## Limits
 
-- Right now the tool targets a specific VA EFB where the envelope is 20–31% MAC.
+- Right now the tool targets a specific VA EFB where the envelope is 20-31% MAC.
 - It needs simbrief.com to be up for the fetch; the paste box is the fallback.
 - The EFB's empty weight is 14,000 kg against SimBrief's 13,340, so its ZFW and TOW read ~665 kg above the OFP (the weight row shows both).
