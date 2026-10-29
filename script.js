@@ -88,11 +88,29 @@ function parseOFP() {
       },
     };
 
-    showStatus("Parsed", "ok");
+    saveOFP();
+    clearStatus();
     renderFlight();
     renderEFB();
   } catch (e) {
     showStatus(e.message || "Could not read the OFP", "bad");
+  }
+}
+
+function saveOFP() {
+  try {
+    localStorage.setItem("ofpData", JSON.stringify(ofpData));
+  } catch {}
+}
+
+function restoreOFP() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("ofpData") || "null");
+    if (!saved?.paxCount) return false;
+    ofpData = saved;
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -123,7 +141,9 @@ async function loadSimBrief() {
     }
 
     ofpData = fromSimBrief(data);
-    showStatus("Parsed", "ok");
+    if (!ofpData.paxCount) throw new Error("That OFP has no passengers");
+    saveOFP();
+    clearStatus();
     renderFlight();
     renderEFB();
   } catch (e) {
@@ -206,6 +226,26 @@ function macToTrim(pctMAC) {
 }
 
 function distribute() {
+  let best = null;
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const dist = buildLoad();
+    const pct = dist.cg.pctMAC;
+    const inLimits = pct >= CG_MIN && pct <= CG_MAX;
+
+    if (
+      !best ||
+      Math.abs(pct - TARGET_CG) < Math.abs(best.cg.pctMAC - TARGET_CG)
+    ) {
+      best = dist;
+    }
+    if (inLimits) return dist;
+  }
+
+  return best;
+}
+
+function buildLoad() {
   let zones = splitZones(ofpData.paxCount);
   let best = null;
   const target = TARGET_CG + (Math.random() * 2 - 1) * TARGET_SPREAD;
@@ -244,8 +284,13 @@ function splitZones(n) {
   b += step;
   c -= step;
 
+  const kids =
+    a > 0 && Math.random() < 0.4
+      ? 1 + Math.floor(Math.random() * Math.min(5, a))
+      : 0;
+
   return {
-    A: { adults: a, children: 0 },
+    A: { adults: a - kids, children: kids },
     B: { adults: b, children: 0 },
     C: { adults: c, children: 0 },
   };
@@ -406,7 +451,7 @@ function renderEFB() {
   const lw = tow - fuel.trip;
 
   $("weightRows").innerHTML = [
-    head4("Weight, tool / plan / max"),
+    `<tr class="head"><td>Weight</td><td></td><td>plan</td><td>max</td></tr>`,
     wrow("ZFW", zfw, ofpData.plan.zfw, ofpData.max.zfw),
     wrow("TOW", tow, ofpData.plan.tow, ofpData.max.tow),
     wrow("LW", lw, ofpData.plan.law, ofpData.max.law),
@@ -417,10 +462,6 @@ function renderEFB() {
 
 function head(text) {
   return `<tr class="head"><td colspan="2">${text}</td></tr>`;
-}
-
-function head4(text) {
-  return `<tr class="head"><td colspan="4">${text}</td></tr>`;
 }
 
 function kg(n) {
@@ -471,7 +512,18 @@ function showStatus(msg, type) {
   box.className = "status " + type;
 }
 
+function clearStatus() {
+  const box = $("statusBox");
+  box.hidden = true;
+  box.textContent = "";
+}
+
 try {
   const saved = localStorage.getItem("simbriefId");
   if (saved) $("simbriefId").value = saved;
 } catch {}
+
+if (restoreOFP()) {
+  renderFlight();
+  renderEFB();
+}

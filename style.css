@@ -85,11 +85,29 @@ button:hover {
   background: #333;
 }
 
+button:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 2px;
+}
+
 .actions {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-top: 12px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .row > button {
+    width: 100%;
+  }
 }
 
 .actions a {
