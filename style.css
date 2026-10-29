@@ -37,21 +37,33 @@ label {
   color: #666;
 }
 
+input,
 textarea {
-  width: 100%;
   padding: 10px 12px;
   border: 1px solid #ccc;
   border-radius: 4px;
+  font: inherit;
+}
+
+input {
+  flex: 1;
+  min-width: 120px;
+}
+
+textarea {
+  width: 100%;
   font-family: ui-monospace, monospace;
   font-size: 12px;
   line-height: 1.5;
   resize: vertical;
 }
 
+input::placeholder,
 textarea::placeholder {
   color: #aaa;
 }
 
+input:focus,
 textarea:focus {
   outline: 2px solid #111;
   outline-offset: -1px;
@@ -128,6 +140,10 @@ summary span {
 
 details table {
   margin-top: 8px;
+}
+
+details textarea {
+  margin-top: 10px;
 }
 
 details .bar {

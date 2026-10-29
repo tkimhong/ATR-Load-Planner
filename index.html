@@ -11,16 +11,31 @@
       <h1>ATR 72-600 load planner</h1>
 
       <section>
-        <label for="ofpText">Paste the SimBrief OFP</label>
-        <textarea
-          id="ofpText"
-          rows="6"
-          spellcheck="false"
-          placeholder="Paste the full OFP text"
-        ></textarea>
-        <div class="actions">
-          <button onclick="parseOFP()">Generate load</button>
+        <label for="simbriefId">SimBrief user ID</label>
+        <div class="row">
+          <input
+            id="simbriefId"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="e.g. 123456"
+          />
+          <button onclick="loadSimBrief()">Generate load</button>
         </div>
+
+        <details>
+          <summary>or paste an OFP</summary>
+          <textarea
+            id="ofpText"
+            rows="6"
+            spellcheck="false"
+            placeholder="Paste the full OFP text"
+          ></textarea>
+          <div class="actions">
+            <button onclick="parseOFP()">Use pasted OFP</button>
+          </div>
+        </details>
+
         <div id="statusBox" class="status" hidden></div>
       </section>
 
@@ -55,21 +70,18 @@
           </div>
 
           <table id="weightRows"></table>
-
-          <div class="actions">
-            <a
-              href="#"
-              onclick="
-                copyAll();
-                return false;
-              "
-              >Copy all</a
-            >
-          </div>
         </details>
 
         <div class="actions">
           <button onclick="regenerate()">Regenerate</button>
+          <a
+            href="#"
+            onclick="
+              copyAll();
+              return false;
+            "
+            >Copy all</a
+          >
         </div>
       </section>
     </main>

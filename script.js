@@ -96,6 +96,69 @@ function parseOFP() {
   }
 }
 
+async function loadSimBrief() {
+  const id = $("simbriefId").value.trim();
+  if (!id) {
+    showStatus("Enter your SimBrief user ID", "bad");
+    return;
+  }
+
+  try {
+    localStorage.setItem("simbriefId", id);
+  } catch {}
+
+  $("flightCard").hidden = true;
+  $("efbCard").hidden = true;
+  showStatus("Fetching", "ok");
+
+  try {
+    const res = await fetch(
+      `https://www.simbrief.com/api/xml.fetcher.php?userid=${encodeURIComponent(id)}&json=1`,
+      { cache: "no-store" },
+    );
+    const data = await res.json();
+
+    if (!res.ok || data.fetch?.status !== "Success") {
+      throw new Error("No OFP found for that user ID");
+    }
+
+    ofpData = fromSimBrief(data);
+    showStatus("Parsed", "ok");
+    renderFlight();
+    renderEFB();
+  } catch (e) {
+    showStatus(e.message || "Could not reach SimBrief", "bad");
+  }
+}
+
+function fromSimBrief(j) {
+  const g = j.general || {};
+  const w = j.weights || {};
+  const f = j.fuel || {};
+
+  return {
+    flightNumber: `${g.icao_airline || ""}${g.flight_number || ""}`,
+    origin: j.origin?.icao_code || "",
+    dest: j.destination?.icao_code || "",
+    aircraft: j.aircraft?.reg || "",
+    atcCallsign: j.atc?.callsign || "",
+    paxCount: Number(w.pax_count_actual || g.passengers || 0),
+    bagCargo: Number(w.cargo || 0),
+    blockFuel: Number(f.plan_ramp || 0),
+    tripFuel: Number(f.enroute_burn || 0),
+    plan: {
+      tow: Number(w.est_tow || 0),
+      law: Number(w.est_ldw || 0),
+      zfw: Number(w.est_zfw || 0),
+    },
+    max: {
+      tow: Number(w.max_tow || 0),
+      law: Number(w.max_ldw || 0),
+      zfw: Number(w.max_zfw || 0),
+    },
+  };
+}
+
 function renderFlight() {
   const d = ofpData;
   const items = [
@@ -380,19 +443,15 @@ function regenerate() {
 function copyAll() {
   if (!lastDist) return;
   const { zones, cargo, fuel, cg } = lastDist;
-  const trim = macToTrim(cg.pctMAC);
+  const inLimits = cg.pctMAC >= CG_MIN && cg.pctMAC <= CG_MAX;
   const text = [
-    `RAMP FUEL: ${fuel.block} kg`,
-    `TRIP FUEL: ${fuel.trip} kg`,
-    "",
-    `ZONE A - Adults: ${zones.A.adults}  Children: ${zones.A.children}`,
-    `ZONE B - Adults: ${zones.B.adults}  Children: ${zones.B.children}`,
-    `ZONE C - Adults: ${zones.C.adults}  Children: ${zones.C.children}`,
-    "",
-    ...COMPS.map((c, i) => `${c.name}: ${cargo[i]} kg`),
-    "",
-    `CG: ${cg.pctMAC.toFixed(1)}% MAC`,
-    `PITCH TRIM: ${trim.toFixed(2)}`,
+    `${ofpData.flightNumber} ${ofpData.origin}-${ofpData.dest}, ${ofpData.paxCount} PAX`,
+    `Ramp ${fuel.block}, trip ${fuel.trip}`,
+    `Zones ${zones.A.adults}/${zones.B.adults}/${zones.C.adults}`,
+    `Cargo ${cargo.join("/")}`,
+    `CG ${cg.pctMAC.toFixed(1)}% MAC, trim ${macToTrim(cg.pctMAC).toFixed(2)}, ${
+      inLimits ? "in limits" : "out of limits"
+    }`,
   ].join("\n");
 
   try {
@@ -411,3 +470,8 @@ function showStatus(msg, type) {
   box.textContent = msg;
   box.className = "status " + type;
 }
+
+try {
+  const saved = localStorage.getItem("simbriefId");
+  if (saved) $("simbriefId").value = saved;
+} catch {}
