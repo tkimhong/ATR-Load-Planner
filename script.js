@@ -1,6 +1,7 @@
 const ADULT_KG = 84;
 const CHILD_KG = 35;
-const ZONE_RATIO = { A: 0.27, B: 0.44, C: 0.29 };
+const ZONE_RATIO = { A: 0.25, B: 0.39, C: 0.36 };
+const SEATS = { A: 18, B: 28, C: 26 };
 
 const COMPS = [
   { name: "Fwd Right", max: 288, arm: 6.662 },
@@ -24,7 +25,7 @@ const OEW_KG = 14000;
 
 const CG_MIN = 20.0;
 const CG_MAX = 31.0;
-const MAX_ATTEMPTS = 50;
+const TARGET_CG = 25.5;
 
 const $ = (id) => document.getElementById(id);
 
@@ -130,64 +131,53 @@ function macToTrim(pctMAC) {
 }
 
 function distribute() {
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const dist = tryDistribute();
+  let zones = splitZones(ofpData.paxCount);
+  let best = null;
+
+  for (let i = 0; i < 40; i++) {
+    const dist = {
+      zones,
+      cargo: solveCargo(zones),
+      fuel: { block: ofpData.blockFuel, trip: ofpData.tripFuel },
+    };
     const cg = calcCG(dist);
-    if (cg.pctMAC >= CG_MIN && cg.pctMAC <= CG_MAX) {
-      dist.cg = cg;
-      return dist;
+    dist.cg = cg;
+
+    if (cg.pctMAC >= CG_MIN && cg.pctMAC <= CG_MAX) return dist;
+    if (
+      !best ||
+      Math.abs(cg.pctMAC - TARGET_CG) < Math.abs(best.cg.pctMAC - TARGET_CG)
+    ) {
+      best = dist;
     }
+
+    zones = shift(zones, cg.pctMAC > TARGET_CG);
+    if (!zones) return best;
   }
-  const dist = tryDistribute();
-  dist.cg = calcCG(dist);
-  return dist;
+
+  return best;
 }
 
-function tryDistribute() {
-  const d = ofpData;
-  const totalPax = d.paxCount;
+function splitZones(n) {
+  const a = Math.min(SEATS.A, Math.round(n * ZONE_RATIO.A));
+  let b = Math.min(SEATS.B, Math.round(n * ZONE_RATIO.B));
+  let c = Math.max(0, Math.min(SEATS.C, n - a - b));
 
-  const maxChildren = Math.min(5, totalPax);
+  const up = Math.min(c, SEATS.B - b);
+  const down = Math.min(b, SEATS.C - c);
+  const step = Math.max(-down, Math.min(up, Math.floor(Math.random() * 5) - 2));
+  b += step;
+  c -= step;
+
   const children =
-    Math.random() < 0.4 ? Math.floor(Math.random() * maxChildren) + 1 : 0;
-
-  let zA = Math.round(totalPax * ZONE_RATIO.A);
-  let zB = Math.round(totalPax * ZONE_RATIO.B);
-
-  zA = jitter(zA, 2, 1);
-  zB = jitter(zB, 2, 1);
-  let zC = totalPax - zA - zB;
-  if (zC < 0) {
-    zB += zC;
-    zC = 0;
-  }
-
-  const childrenInA = Math.min(children, zA);
-
-  const totalHold = estimateHoldWeight(totalPax);
-  const fwdFrac = rand(0.43, 0.58);
-  const totalFwd = clampRound(totalHold * fwdFrac, 10);
-  const totalAft = totalHold - totalFwd;
-
-  const fwdRight = Math.min(
-    clampRound(totalFwd * rand(0.35, 0.55), 10),
-    COMPS[0].max,
-  );
-  const fwdLeft = Math.min(clampRound(totalFwd - fwdRight, 10), COMPS[1].max);
-  const rearFwd = Math.min(
-    clampRound(totalAft * rand(0.3, 0.55), 10),
-    COMPS[2].max,
-  );
-  const rearAft = Math.min(clampRound(totalAft - rearFwd, 10), COMPS[3].max);
+    a > 0 && Math.random() < 0.4
+      ? 1 + Math.floor(Math.random() * Math.min(5, a))
+      : 0;
 
   return {
-    zones: {
-      A: { adults: zA - childrenInA, children: childrenInA },
-      B: { adults: zB, children: 0 },
-      C: { adults: zC, children: 0 },
-    },
-    cargo: [fwdRight, fwdLeft, rearFwd, rearAft],
-    fuel: { block: d.blockFuel, trip: d.tripFuel },
+    A: { adults: Math.max(0, a - children), children: Math.min(children, a) },
+    B: { adults: b, children: 0 },
+    C: { adults: c, children: 0 },
   };
 }
 
@@ -195,19 +185,92 @@ function estimateHoldWeight(totalPax) {
   return Math.min(Math.max(Math.round(totalPax * 12), 400), 820);
 }
 
-function jitter(val, range, min) {
-  return Math.max(
-    min,
-    val + Math.floor(Math.random() * (range * 2 + 1)) - range,
+function solveCargo(zones) {
+  const hold = estimateHoldWeight(ofpData.paxCount);
+  const fuel = Math.max(0, ofpData.blockFuel - 50);
+
+  const paxA = zones.A.adults * ADULT_KG + zones.A.children * CHILD_KG;
+  const paxB = zones.B.adults * ADULT_KG;
+  const paxC = zones.C.adults * ADULT_KG;
+
+  const weight = OEW_KG + paxA + paxB + paxC + fuel;
+  const moment =
+    OEW_KG * ARM.OEW +
+    paxA * ARM.ZONE_A +
+    paxB * ARM.ZONE_B +
+    paxC * ARM.ZONE_C +
+    fuel * ARM.FUEL;
+
+  const target = LEMAC + (TARGET_CG / 100) * MAC;
+  const need = target * (weight + hold) - moment;
+
+  const fwdCap = COMPS[0].max + COMPS[1].max;
+  const aftCap = COMPS[2].max + COMPS[3].max;
+  const aftArm =
+    (COMPS[2].max * COMPS[2].arm + COMPS[3].max * COMPS[3].arm) / aftCap;
+
+  const wanted = (hold * aftArm - need) / (aftArm - COMPS[0].arm);
+  const fwd = Math.round(Math.min(fwdCap, Math.max(0, wanted)) / 10) * 10;
+
+  const fwdRight = Math.min(
+    COMPS[0].max,
+    Math.round(((fwd * COMPS[0].max) / fwdCap) / 10) * 10,
   );
+  const fwdLeft = Math.min(COMPS[1].max, fwd - fwdRight);
+
+  const aft = Math.min(aftCap, hold - fwd);
+  const rearFwd = Math.min(
+    COMPS[2].max,
+    Math.round(((aft * COMPS[2].max) / aftCap) / 10) * 10,
+  );
+  const rearAft = Math.min(COMPS[3].max, aft - rearFwd);
+
+  return [fwdRight, fwdLeft, rearFwd, rearAft];
 }
 
-function rand(lo, hi) {
-  return lo + Math.random() * (hi - lo);
-}
+function shift(zones, forward) {
+  const z = { A: { ...zones.A }, B: { ...zones.B }, C: { ...zones.C } };
+  const room = {
+    A: SEATS.A - z.A.adults - z.A.children,
+    B: SEATS.B - z.B.adults,
+    C: SEATS.C - z.C.adults,
+  };
 
-function clampRound(val, step) {
-  return Math.round(val / step) * step;
+  if (forward) {
+    if (z.C.adults > 0 && room.B > 0) {
+      z.C.adults--;
+      z.B.adults++;
+      return z;
+    }
+    if (z.B.adults > 0 && room.A > 0) {
+      z.B.adults--;
+      z.A.adults++;
+      return z;
+    }
+    if (z.C.adults > 0 && room.A > 0) {
+      z.C.adults--;
+      z.A.adults++;
+      return z;
+    }
+  } else {
+    if (z.A.adults > 0 && room.B > 0) {
+      z.A.adults--;
+      z.B.adults++;
+      return z;
+    }
+    if (z.B.adults > 0 && room.C > 0) {
+      z.B.adults--;
+      z.C.adults++;
+      return z;
+    }
+    if (z.A.adults > 0 && room.C > 0) {
+      z.A.adults--;
+      z.C.adults++;
+      return z;
+    }
+  }
+
+  return null;
 }
 
 function renderEFB() {
