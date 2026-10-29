@@ -26,6 +26,7 @@ const OEW_KG = 14000;
 const CG_MIN = 20.0;
 const CG_MAX = 31.0;
 const TARGET_CG = 25.5;
+const TARGET_SPREAD = 1.0;
 
 const $ = (id) => document.getElementById(id);
 
@@ -52,6 +53,12 @@ function parseOFP() {
     const trip = text.match(/^TRIP\s+\w+\s+(\d+)/m);
     const pax = text.match(/^PAX\s+(\d+)/m);
     const bag = text.match(/^BAG\/CARGO\s+(\d+)/m);
+    const maxRow = text.match(
+      /MAXIMUM\s+TOW\s+(\d+)\s+LAW\s+(\d+)\s+ZFW\s+(\d+)/,
+    );
+    const planRow = text.match(
+      /ESTIMATED\s+TOW\s+(\d+)\s+LAW\s+(\d+)\s+ZFW\s+(\d+)/,
+    );
 
     const paxCount = parseInt(pax?.[1] || 0, 10);
     const blockFuel = parseInt(block?.[1] || 0, 10);
@@ -69,6 +76,16 @@ function parseOFP() {
       bagCargo: parseInt(bag?.[1] || 0, 10),
       blockFuel,
       tripFuel: parseInt(trip?.[1] || 0, 10),
+      plan: {
+        tow: parseInt(planRow?.[1] || 0, 10),
+        law: parseInt(planRow?.[2] || 0, 10),
+        zfw: parseInt(planRow?.[3] || 0, 10),
+      },
+      max: {
+        tow: parseInt(maxRow?.[1] || 0, 10),
+        law: parseInt(maxRow?.[2] || 0, 10),
+        zfw: parseInt(maxRow?.[3] || 0, 10),
+      },
     };
 
     showStatus("Parsed", "ok");
@@ -106,12 +123,7 @@ function calcCG(dist) {
   const ramp = Math.max(0, fuel.block - 50);
 
   const total =
-    OEW_KG +
-    paxA +
-    paxB +
-    paxC +
-    ramp +
-    cargo.reduce((sum, kg) => sum + kg, 0);
+    OEW_KG + paxA + paxB + paxC + ramp + cargo.reduce((sum, kg) => sum + kg, 0);
 
   const moment =
     OEW_KG * ARM.OEW +
@@ -133,25 +145,25 @@ function macToTrim(pctMAC) {
 function distribute() {
   let zones = splitZones(ofpData.paxCount);
   let best = null;
+  const target = TARGET_CG + (Math.random() * 2 - 1) * TARGET_SPREAD;
 
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 60; i++) {
     const dist = {
       zones,
-      cargo: solveCargo(zones),
+      cargo: solveCargo(zones, target),
       fuel: { block: ofpData.blockFuel, trip: ofpData.tripFuel },
     };
     const cg = calcCG(dist);
     dist.cg = cg;
 
-    if (cg.pctMAC >= CG_MIN && cg.pctMAC <= CG_MAX) return dist;
-    if (
-      !best ||
-      Math.abs(cg.pctMAC - TARGET_CG) < Math.abs(best.cg.pctMAC - TARGET_CG)
-    ) {
+    const error = cg.pctMAC - target;
+    if (Math.abs(error) <= 0.4) return dist;
+
+    if (!best || Math.abs(error) < Math.abs(best.cg.pctMAC - target)) {
       best = dist;
     }
 
-    zones = shift(zones, cg.pctMAC > TARGET_CG);
+    zones = shift(zones, error > 0);
     if (!zones) return best;
   }
 
@@ -169,24 +181,23 @@ function splitZones(n) {
   b += step;
   c -= step;
 
-  const children =
-    a > 0 && Math.random() < 0.4
-      ? 1 + Math.floor(Math.random() * Math.min(5, a))
-      : 0;
-
   return {
-    A: { adults: Math.max(0, a - children), children: Math.min(children, a) },
+    A: { adults: a, children: 0 },
     B: { adults: b, children: 0 },
     C: { adults: c, children: 0 },
   };
 }
 
-function estimateHoldWeight(totalPax) {
-  return Math.min(Math.max(Math.round(totalPax * 12), 400), 820);
+function cargoWeight() {
+  const cap = COMPS.reduce((sum, c) => sum + c.max, 0);
+  if (ofpData.bagCargo > 0) return Math.min(ofpData.bagCargo, cap);
+
+  const guess = Math.round(ofpData.paxCount * 12);
+  return Math.min(Math.max(guess, 400), 820);
 }
 
-function solveCargo(zones) {
-  const hold = estimateHoldWeight(ofpData.paxCount);
+function solveCargo(zones, target) {
+  const hold = cargoWeight();
   const fuel = Math.max(0, ofpData.blockFuel - 50);
 
   const paxA = zones.A.adults * ADULT_KG + zones.A.children * CHILD_KG;
@@ -201,8 +212,8 @@ function solveCargo(zones) {
     paxC * ARM.ZONE_C +
     fuel * ARM.FUEL;
 
-  const target = LEMAC + (TARGET_CG / 100) * MAC;
-  const need = target * (weight + hold) - moment;
+  const aim = LEMAC + (target / 100) * MAC;
+  const need = aim * (weight + hold) - moment;
 
   const fwdCap = COMPS[0].max + COMPS[1].max;
   const aftCap = COMPS[2].max + COMPS[3].max;
@@ -214,14 +225,14 @@ function solveCargo(zones) {
 
   const fwdRight = Math.min(
     COMPS[0].max,
-    Math.round(((fwd * COMPS[0].max) / fwdCap) / 10) * 10,
+    Math.round((fwd * COMPS[0].max) / fwdCap / 10) * 10,
   );
   const fwdLeft = Math.min(COMPS[1].max, fwd - fwdRight);
 
-  const aft = Math.min(aftCap, hold - fwd);
+  const aft = Math.min(aftCap, hold - (fwdRight + fwdLeft));
   const rearFwd = Math.min(
     COMPS[2].max,
-    Math.round(((aft * COMPS[2].max) / aftCap) / 10) * 10,
+    Math.round((aft * COMPS[2].max) / aftCap / 10) * 10,
   );
   const rearAft = Math.min(COMPS[3].max, aft - rearFwd);
 
@@ -325,11 +336,37 @@ function renderEFB() {
   ].join("");
 
   $("efbRows").innerHTML = rows;
+
+  const ramp = Math.max(0, fuel.block - 50);
+  const zfw = cg.total - ramp;
+  const tow = cg.total;
+  const lw = tow - fuel.trip;
+
+  $("weightRows").innerHTML = [
+    head4("Weight, tool / plan / max"),
+    wrow("ZFW", zfw, ofpData.plan.zfw, ofpData.max.zfw),
+    wrow("TOW", tow, ofpData.plan.tow, ofpData.max.tow),
+    wrow("LW", lw, ofpData.plan.law, ofpData.max.law),
+  ].join("");
+
   $("efbCard").hidden = false;
 }
 
 function head(text) {
   return `<tr class="head"><td colspan="2">${text}</td></tr>`;
+}
+
+function head4(text) {
+  return `<tr class="head"><td colspan="4">${text}</td></tr>`;
+}
+
+function kg(n) {
+  return n > 0 ? n.toLocaleString("en-US") : "-";
+}
+
+function wrow(label, value, plan, max) {
+  const over = max > 0 && value > max;
+  return `<tr><td>${label}</td><td class="${over ? "bad" : ""}">${kg(value)}</td><td>${kg(plan)}</td><td>${kg(max)}</td></tr>`;
 }
 
 function row(label, value, bad) {
