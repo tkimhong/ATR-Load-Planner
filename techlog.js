@@ -1,0 +1,216 @@
+const COLS = [
+  ["pilot", "PILOT"],
+  ["date", "DATE"],
+  ["flight", "FLIGHT"],
+  ["type", "TYPE"],
+  ["dep", "DEP"],
+  ["off", "BLK OFF"],
+  ["to", "TO"],
+  ["arr", "ARR"],
+  ["ldg", "LDG"],
+  ["on", "BLK ON"],
+  ["blk", "BLK"],
+  ["air", "FLIGHT"],
+  ["cycles", "CYCLES"],
+  ["uplift", "FUEL UPLIFT"],
+  ["fuelDep", "FUEL DEP"],
+  ["fuelArr", "FUEL ARR"],
+  ["fuelUsed", "FUEL USED"],
+];
+
+const $ = (id) => document.getElementById(id);
+
+let ofp = null;
+let inputs = {};
+
+function setStatus(msg, tone) {
+  const el = $("status");
+  el.hidden = !msg;
+  el.textContent = msg || "";
+  el.className = "status" + (tone ? " " + tone : "");
+}
+
+async function fetchOFP() {
+  const id = $("simbriefId").value.trim();
+  if (!id) return setStatus("Enter your SimBrief user ID", "bad");
+
+  try {
+    localStorage.setItem("simbriefId", id);
+  } catch {}
+
+  setStatus("Fetching");
+
+  try {
+    const res = await fetch(
+      `https://www.simbrief.com/api/xml.fetcher.php?userid=${encodeURIComponent(id)}&json=1`,
+      { cache: "no-store" },
+    );
+    const data = await res.json();
+
+    if (!res.ok || data.fetch?.status !== "Success") {
+      throw new Error("No OFP found for that user ID");
+    }
+
+    ofp = {
+      dep: data.origin?.icao_code || "",
+      arr: data.destination?.icao_code || "",
+      ramp: Number(data.fuel?.plan_ramp || 0),
+      reg: data.aircraft?.reg || "",
+    };
+
+    setStatus(`OFP ${ofp.dep}-${ofp.arr}, ${ofp.ramp} kg ramp`, "ok");
+    if ($("pirep").value.trim()) build();
+  } catch (e) {
+    setStatus(e.message || "Could not reach SimBrief", "bad");
+  }
+}
+
+function fuelBlock(text) {
+  const start = text.indexOf("Fuel (kg)");
+  if (start < 0) return null;
+
+  const actual = text.indexOf("Actual", start);
+  if (actual < 0) return null;
+
+  const nums = (text.slice(actual).match(/\d[\d,]*/g) || [])
+    .slice(0, 5)
+    .map((n) => Number(n.replace(/,/g, "")));
+
+  if (nums.length < 4) return null;
+  return {
+    ramp: nums[0],
+    takeoff: nums[1],
+    used: nums[2],
+    landing: nums[3],
+  };
+}
+
+function parsePIREP(text) {
+  const pick = (re) => (text.match(re) || [])[1] || "";
+
+  return {
+    flight: pick(/Flight Number\s*([A-Z]{2,3}\d+)/),
+    type: pick(/Type\s+(Scheduled|Repositioning)/i),
+    date: pick(/Tracking Started\s+([A-Z][a-z]{2} \d{1,2}, \d{4})/),
+    off: pick(/Off Blocks\s+(\d{1,2}:\d{2})/),
+    to: pick(/Takeoff\s+(\d{1,2}:\d{2})/),
+    ldg: pick(/Landing\s+(\d{1,2}:\d{2})/),
+    on: pick(/On Blocks\s+(\d{1,2}:\d{2})/),
+    blk: pick(/Block Time\s+(\d{1,2}:\d{2}:\d{2})/),
+    air: pick(/Airborne\s+(\d{1,2}:\d{2}:\d{2})/),
+    fuel: fuelBlock(text),
+  };
+}
+
+function hhmm(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":");
+  return h.padStart(2, "0") + m;
+}
+
+function hmm(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":");
+  return `${Number(h)}:${m}`;
+}
+
+function ddmmyyyy(s) {
+  const d = new Date(s);
+  if (!s || Number.isNaN(d.getTime())) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+function build() {
+  const text = $("pirep").value;
+  if (!text.trim()) return setStatus("Paste the PIREP block first", "bad");
+
+  const p = parsePIREP(text);
+  const fuel = p.fuel || {};
+
+  const pilot = $("pilotId").value.trim().toUpperCase();
+  try {
+    localStorage.setItem("pilotId", pilot);
+  } catch {}
+
+  const values = {
+    pilot,
+    date: ddmmyyyy(p.date) || ddmmyyyy(new Date()),
+    flight: (p.flight.match(/\d+/) || [""])[0],
+    type: p.type ? p.type[0].toUpperCase() : "",
+    dep: ofp?.dep || "",
+    off: hhmm(p.off),
+    to: hhmm(p.to),
+    arr: ofp?.arr || "",
+    ldg: hhmm(p.ldg),
+    on: hhmm(p.on),
+    blk: hmm(p.blk),
+    air: hmm(p.air),
+    cycles: "1",
+    uplift: "",
+    fuelDep: fuel.ramp ? String(fuel.ramp) : ofp?.ramp ? String(ofp.ramp) : "",
+    fuelArr: fuel.landing ? String(fuel.landing) : "",
+    fuelUsed: fuel.used ? String(fuel.used) : "",
+  };
+
+  renderFields(values);
+  $("rowCard").hidden = false;
+  updatePreview();
+
+  const missing = COLS.filter(
+    ([key]) => key !== "uplift" && !inputs[key].value,
+  ).map(([, label]) => label);
+
+  if (missing.length) {
+    setStatus(`Missing: ${missing.join(", ")}`, "bad");
+  } else {
+    setStatus("Row ready, add FUEL UPLIFT", "warn");
+  }
+}
+
+function renderFields(values) {
+  $("fields").innerHTML = COLS.map(
+    ([key, label]) =>
+      `<tr><td>${label}</td><td><input id="f_${key}"></td></tr>`,
+  ).join("");
+
+  inputs = {};
+  for (const [key] of COLS) {
+    const el = $(`f_${key}`);
+    el.value = values[key] ?? "";
+    inputs[key] = el;
+  }
+}
+
+function readRow() {
+  return COLS.map(([key]) => inputs[key]?.value.trim() ?? "");
+}
+
+function updatePreview() {
+  $("preview").textContent = readRow().join("\t");
+}
+
+function copyRow() {
+  if (!Object.keys(inputs).length) return;
+
+  const text = readRow().join("\t");
+
+  try {
+    navigator.clipboard.writeText(text).then(
+      () => setStatus("Copied", "ok"),
+      () => setStatus("Copy failed", "bad"),
+    );
+  } catch {
+    setStatus("Copy failed", "bad");
+  }
+}
+
+$("fields").addEventListener("input", updatePreview);
+
+try {
+  const saved = localStorage.getItem("simbriefId");
+  if (saved) $("simbriefId").value = saved;
+
+  const pilot = localStorage.getItem("pilotId");
+  if (pilot) $("pilotId").value = pilot;
+} catch {}
