@@ -139,6 +139,23 @@ function parsePrev(value) {
   return Number(raw.replace(/,/g, "")) || 0;
 }
 
+function updatePrev() {
+  const raw = $("prevArr").value.trim();
+  const value = parsePrev(raw);
+  const el = $("prevValue");
+
+  if (!value) {
+    el.textContent = "";
+    return;
+  }
+
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  el.textContent =
+    tokens.length >= 17
+      ? `using ${value} from the pasted row`
+      : `using ${value}`;
+}
+
 function applyPrev() {
   const prev = parsePrev($("prevArr").value);
   if (!prev || !inputs.fuelDep) return;
@@ -187,6 +204,7 @@ function build() {
   const callsign = p.callsign || ofp?.callsign || "";
   $("operator").textContent = (callsign.match(/^[A-Z]{2,3}/) || [""])[0];
   $("reg").textContent = p.reg || ofp?.reg || "";
+  updatePrev();
 
   renderFields(values);
   $("rowCard").hidden = false;
@@ -259,12 +277,22 @@ function copyRow() {
 
   try {
     navigator.clipboard.writeText(text).then(
-      () => setStatus("Copied", "ok"),
-      () => setStatus("Copy failed", "bad"),
+      () => flashButton("Copied"),
+      () => flashButton("Copy failed"),
     );
   } catch {
-    setStatus("Copy failed", "bad");
+    flashButton("Copy failed");
   }
+}
+
+let flashTimer;
+function flashButton(label) {
+  const btn = $("copyBtn");
+  clearTimeout(flashTimer);
+  btn.textContent = label;
+  flashTimer = setTimeout(() => {
+    btn.textContent = "Copy row";
+  }, 1500);
 }
 
 $("fields").addEventListener("input", (e) =>
@@ -274,6 +302,7 @@ $("fields").addEventListener("input", (e) =>
 $("prevArr").addEventListener("input", () => {
   if (!inputs.fuelDep) return;
   applyPrev();
+  updatePrev();
   updatePreview();
   updateNote();
 });

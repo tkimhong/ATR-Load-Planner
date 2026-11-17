@@ -298,6 +298,12 @@ pre {
   border-radius: 4px;
   font-family: ui-monospace, monospace;
   font-size: 11px;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.prev-value {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #888;
 }

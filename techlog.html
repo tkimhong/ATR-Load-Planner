@@ -9,9 +9,7 @@
   <body>
     <main>
       <h1>ATR tech log</h1>
-      <p class="sub">
-        Paste the PIREP, copy the spreadsheet row. <a href="./">load planner</a>
-      </p>
+      <p class="sub"><a href="./">load planner</a> · tech log</p>
 
       <section>
         <label for="pilotId">Pilot ID</label>
@@ -68,12 +66,13 @@
           autocomplete="off"
           placeholder="paste the last row, or type the figure"
         />
+        <p id="prevValue" class="prev-value"></p>
 
         <table id="fields"></table>
         <p id="note" class="note"></p>
 
         <div class="row actions">
-          <button onclick="copyRow()">Copy row</button>
+          <button id="copyBtn" onclick="copyRow()">Copy row</button>
         </div>
         <pre id="preview"></pre>
       </section>
