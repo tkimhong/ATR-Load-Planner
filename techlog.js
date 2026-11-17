@@ -58,7 +58,10 @@ async function fetchOFP() {
       reg: data.aircraft?.reg || "",
     };
 
-    setStatus(`OFP ${ofp.dep}-${ofp.arr}, ${ofp.ramp} kg ramp`, "ok");
+    setStatus(
+      `OFP ${ofp.reg} ${ofp.dep}-${ofp.arr}, ${ofp.ramp} kg ramp`,
+      "ok",
+    );
     if ($("pirep").value.trim()) build();
   } catch (e) {
     setStatus(e.message || "Could not reach SimBrief", "bad");
@@ -91,6 +94,7 @@ function parsePIREP(text) {
   return {
     flight: pick(/Flight Number\s*([A-Z]{2,3}\d+)/),
     type: pick(/Type\s+(Scheduled|Repositioning)/i),
+    reg: pick(/Aircraft\s+([A-Z0-9]{1,2}-[A-Z0-9]{3,4})/),
     date: pick(/Tracking Started\s+([A-Z][a-z]{2} \d{1,2}, \d{4})/),
     off: pick(/Off Blocks\s+(\d{1,2}:\d{2})/),
     to: pick(/Takeoff\s+(\d{1,2}:\d{2})/),
@@ -121,6 +125,26 @@ function ddmmyyyy(s) {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+function round10(n) {
+  return Math.round(n / 10) * 10;
+}
+
+function parsePrev(value) {
+  const tokens = (value || "").trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return 0;
+
+  const raw = tokens.length >= 17 ? tokens[15] : tokens[0];
+  return Number(raw.replace(/,/g, "")) || 0;
+}
+
+function applyPrev() {
+  const prev = parsePrev($("prevArr").value);
+  if (!prev || !inputs.fuelDep) return;
+
+  const dep = Number(inputs.fuelDep.value) || 0;
+  if (dep) inputs.uplift.value = String(Math.max(0, dep - prev));
+}
+
 function build() {
   const text = $("pirep").value;
   if (!text.trim()) return setStatus("Paste the PIREP block first", "bad");
@@ -128,13 +152,15 @@ function build() {
   const p = parsePIREP(text);
   const fuel = p.fuel || {};
 
-  const fuelDep = fuel.ramp || ofp?.ramp || 0;
-  const fuelArr = fuel.landing || 0;
-
   const pilot = $("pilotId").value.trim().toUpperCase();
   try {
     localStorage.setItem("pilotId", pilot);
   } catch {}
+
+  const fuelDep = round10(fuel.ramp || ofp?.ramp || 0);
+  const fuelArr = round10(fuel.landing || 0);
+  const prev = parsePrev($("prevArr").value);
+  const uplift = prev ? Math.max(0, fuelDep - prev) : 0;
 
   const values = {
     pilot,
@@ -150,11 +176,13 @@ function build() {
     blk: hmm(p.blk),
     air: hmm(p.air),
     cycles: "1",
-    uplift: "",
+    uplift: uplift ? String(uplift) : "",
     fuelDep: fuelDep ? String(fuelDep) : "",
     fuelArr: fuelArr ? String(fuelArr) : "",
     fuelUsed: fuelDep && fuelArr ? String(fuelDep - fuelArr) : "",
   };
+
+  $("aircraft").textContent = p.reg || ofp?.reg || "";
 
   renderFields(values);
   $("rowCard").hidden = false;
@@ -204,6 +232,14 @@ function updateNote() {
   }
 }
 
+function handleFieldInput(key) {
+  if (key === "fuelDep") applyPrev();
+  if (key === "fuelDep" || key === "fuelArr") syncFuelUsed();
+
+  updatePreview();
+  updateNote();
+}
+
 function readRow() {
   return COLS.map(([key]) => inputs[key]?.value.trim() ?? "");
 }
@@ -227,9 +263,13 @@ function copyRow() {
   }
 }
 
-$("fields").addEventListener("input", (e) => {
-  const key = e.target.dataset.key;
-  if (key === "fuelDep" || key === "fuelArr") syncFuelUsed();
+$("fields").addEventListener("input", (e) =>
+  handleFieldInput(e.target.dataset.key),
+);
+
+$("prevArr").addEventListener("input", () => {
+  if (!inputs.fuelDep) return;
+  applyPrev();
   updatePreview();
   updateNote();
 });

@@ -5,65 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ATR tech log</title>
     <link rel="stylesheet" href="style.css" />
-    <style>
-      .sub {
-        margin-top: 2px;
-        font-size: 12px;
-        color: #888;
-      }
-
-      .sub a {
-        color: #666;
-      }
-
-      #pilotId {
-        width: 100%;
-      }
-
-      .spaced {
-        margin-top: 16px;
-      }
-
-      .warn {
-        color: #8a6d3b;
-      }
-
-      .note {
-        margin-top: 10px;
-        font-size: 12px;
-        color: #8a6d3b;
-      }
-
-      td:first-child {
-        width: 130px;
-        font-size: 12px;
-        color: #666;
-      }
-
-      #fields td + td {
-        text-align: left;
-        font-family: inherit;
-      }
-
-      #fields td input {
-        width: 100%;
-        padding: 6px 8px;
-        font-family: ui-monospace, monospace;
-        font-size: 13px;
-      }
-
-      pre {
-        margin: 14px 0 0;
-        padding: 10px;
-        background: #f6f6f6;
-        border: 1px solid #e5e5e5;
-        border-radius: 4px;
-        font-family: ui-monospace, monospace;
-        font-size: 11px;
-        white-space: pre-wrap;
-        word-break: break-all;
-      }
-    </style>
   </head>
   <body>
     <main>
@@ -115,8 +56,20 @@
       </section>
 
       <section id="rowCard" hidden>
+        <p id="aircraft" class="aircraft"></p>
+
+        <label for="prevArr">Previous landing (kg)</label>
+        <input
+          id="prevArr"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="paste the last row, or type the figure"
+        />
+
         <table id="fields"></table>
         <p id="note" class="note"></p>
+
         <div class="row actions">
           <button onclick="copyRow()">Copy row</button>
         </div>
