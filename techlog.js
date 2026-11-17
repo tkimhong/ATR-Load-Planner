@@ -23,6 +23,50 @@ const $ = (id) => document.getElementById(id);
 let ofp = null;
 let inputs = {};
 
+function saveState() {
+  try {
+    localStorage.setItem(
+      "techlog",
+      JSON.stringify({
+        pirep: $("pirep").value,
+        prev: $("prevArr").value,
+        ofp,
+      }),
+    );
+  } catch {}
+}
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("techlog") || "null");
+    if (!saved) return false;
+
+    if (saved.pirep) $("pirep").value = saved.pirep;
+    if (saved.prev) $("prevArr").value = saved.prev;
+    if (saved.ofp) ofp = saved.ofp;
+
+    return !!saved.pirep;
+  } catch {
+    return false;
+  }
+}
+
+function clearAll() {
+  try {
+    localStorage.removeItem("techlog");
+  } catch {}
+
+  $("pirep").value = "";
+  $("prevArr").value = "";
+  $("rowCard").hidden = true;
+  $("preview").textContent = "";
+  $("note").textContent = "";
+  $("prevValue").textContent = "";
+  ofp = null;
+  inputs = {};
+  setStatus("");
+}
+
 function setStatus(msg, tone) {
   const el = $("status");
   el.hidden = !msg;
@@ -209,6 +253,7 @@ function build() {
   renderFields(values);
   $("rowCard").hidden = false;
   updatePreview();
+  saveState();
 
   const missing = COLS.filter(
     ([key]) => key !== "uplift" && !inputs[key].value,
@@ -307,6 +352,12 @@ $("prevArr").addEventListener("input", () => {
   updateNote();
 });
 
+let saveTimer;
+$("pirep").addEventListener("input", () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveState, 400);
+});
+
 try {
   const saved = localStorage.getItem("simbriefId");
   if (saved) $("simbriefId").value = saved;
@@ -314,3 +365,5 @@ try {
   const pilot = localStorage.getItem("pilotId");
   if (pilot) $("pilotId").value = pilot;
 } catch {}
+
+if (loadState()) build();
