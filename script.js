@@ -396,17 +396,32 @@ function renderEFB() {
   lastDist = distribute();
   const { zones, cargo, fuel, cg } = lastDist;
 
-  const inLimits = cg.pctMAC >= CG_MIN && cg.pctMAC <= CG_MAX;
+  const ramp = Math.max(0, fuel.block - 50);
+  const zfw = cg.total - ramp;
+  const tow = cg.total;
+  const lw = tow - fuel.trip;
+
+  const cgOk = cg.pctMAC >= CG_MIN && cg.pctMAC <= CG_MAX;
+  const over = [
+    ["ZFW", zfw, ofpData.max.zfw],
+    ["TOW", tow, ofpData.max.tow],
+    ["LW", lw, ofpData.max.law],
+  ].find(([, value, max]) => max > 0 && value > max);
+
+  const status = !cgOk
+    ? "out of limits"
+    : over
+      ? `over ${over[0]}`
+      : "in limits";
+  const inLimits = cgOk && !over;
   const trim = macToTrim(cg.pctMAC);
 
   $("cgPercent").textContent = cg.pctMAC.toFixed(1) + "% MAC";
-  $("cgPercent").className = inLimits ? "ok" : "bad";
+  $("cgPercent").className = cgOk ? "ok" : "bad";
   $("cgTrim").textContent = trim.toFixed(2);
-  $("cgStatus").textContent = inLimits ? "in limits" : "out of limits";
+  $("cgStatus").textContent = status;
   $("cgStatus").className = inLimits ? "ok" : "bad";
-  $("cgSummary").textContent = `${cg.pctMAC.toFixed(1)}% MAC, ${
-    inLimits ? "in limits" : "out of limits"
-  }`;
+  $("cgSummary").textContent = `${cg.pctMAC.toFixed(1)}% MAC, ${status}`;
 
   const span = 20;
   const pos = (pct) =>
@@ -418,7 +433,7 @@ function renderEFB() {
   $("macOk").style.width =
     Math.round(((CG_MAX - CG_MIN) / span) * 1000) / 10 + "%";
   $("macPointer").style.left = pos(cg.pctMAC);
-  $("macPointer").style.background = inLimits ? "#070" : "#c00";
+  $("macPointer").style.background = cgOk ? "#070" : "#c00";
 
   const rows = [
     head("Fuel"),
@@ -444,11 +459,6 @@ function renderEFB() {
   ].join("");
 
   $("efbRows").innerHTML = rows;
-
-  const ramp = Math.max(0, fuel.block - 50);
-  const zfw = cg.total - ramp;
-  const tow = cg.total;
-  const lw = tow - fuel.trip;
 
   $("weightRows").innerHTML = [
     `<tr class="head"><td>Weight</td><td></td><td>plan</td><td>max</td></tr>`,
