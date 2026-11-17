@@ -128,6 +128,9 @@ function build() {
   const p = parsePIREP(text);
   const fuel = p.fuel || {};
 
+  const fuelDep = fuel.ramp || ofp?.ramp || 0;
+  const fuelArr = fuel.landing || 0;
+
   const pilot = $("pilotId").value.trim().toUpperCase();
   try {
     localStorage.setItem("pilotId", pilot);
@@ -148,9 +151,9 @@ function build() {
     air: hmm(p.air),
     cycles: "1",
     uplift: "",
-    fuelDep: fuel.ramp ? String(fuel.ramp) : ofp?.ramp ? String(ofp.ramp) : "",
-    fuelArr: fuel.landing ? String(fuel.landing) : "",
-    fuelUsed: fuel.used ? String(fuel.used) : "",
+    fuelDep: fuelDep ? String(fuelDep) : "",
+    fuelArr: fuelArr ? String(fuelArr) : "",
+    fuelUsed: fuelDep && fuelArr ? String(fuelDep - fuelArr) : "",
   };
 
   renderFields(values);
@@ -171,7 +174,7 @@ function build() {
 function renderFields(values) {
   $("fields").innerHTML = COLS.map(
     ([key, label]) =>
-      `<tr><td>${label}</td><td><input id="f_${key}"></td></tr>`,
+      `<tr><td>${label}</td><td><input id="f_${key}" data-key="${key}"></td></tr>`,
   ).join("");
 
   inputs = {};
@@ -179,6 +182,25 @@ function renderFields(values) {
     const el = $(`f_${key}`);
     el.value = values[key] ?? "";
     inputs[key] = el;
+  }
+}
+
+function syncFuelUsed() {
+  const dep = Number(inputs.fuelDep.value) || 0;
+  const arr = Number(inputs.fuelArr.value) || 0;
+  if (dep && arr) inputs.fuelUsed.value = String(dep - arr);
+}
+
+function updateNote() {
+  const dep = Number(inputs.fuelDep?.value) || 0;
+  const arr = Number(inputs.fuelArr?.value) || 0;
+  const used = Number(inputs.fuelUsed?.value) || 0;
+  const note = $("note");
+
+  if (dep && arr && used && used !== dep - arr) {
+    note.textContent = `FUEL USED is ${used}, but ${dep} - ${arr} is ${dep - arr}`;
+  } else {
+    note.textContent = "";
   }
 }
 
@@ -205,7 +227,12 @@ function copyRow() {
   }
 }
 
-$("fields").addEventListener("input", updatePreview);
+$("fields").addEventListener("input", (e) => {
+  const key = e.target.dataset.key;
+  if (key === "fuelDep" || key === "fuelArr") syncFuelUsed();
+  updatePreview();
+  updateNote();
+});
 
 try {
   const saved = localStorage.getItem("simbriefId");
