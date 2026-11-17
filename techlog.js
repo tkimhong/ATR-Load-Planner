@@ -56,6 +56,7 @@ async function fetchOFP() {
       arr: data.destination?.icao_code || "",
       ramp: Number(data.fuel?.plan_ramp || 0),
       reg: data.aircraft?.reg || "",
+      callsign: data.atc?.callsign || "",
     };
 
     setStatus(
@@ -93,6 +94,7 @@ function parsePIREP(text) {
 
   return {
     flight: pick(/Flight Number\s*([A-Z]{2,3}\d+)/),
+    callsign: pick(/Callsign\s+([A-Z0-9]+)/),
     type: pick(/Type\s+(Scheduled|Repositioning)/i),
     reg: pick(/Aircraft\s+([A-Z0-9]{1,2}-[A-Z0-9]{3,4})/),
     date: pick(/Tracking Started\s+([A-Z][a-z]{2} \d{1,2}, \d{4})/),
@@ -182,7 +184,9 @@ function build() {
     fuelUsed: fuelDep && fuelArr ? String(fuelDep - fuelArr) : "",
   };
 
-  $("aircraft").textContent = p.reg || ofp?.reg || "";
+  const callsign = p.callsign || ofp?.callsign || "";
+  $("operator").textContent = (callsign.match(/^[A-Z]{2,3}/) || [""])[0];
+  $("reg").textContent = p.reg || ofp?.reg || "";
 
   renderFields(values);
   $("rowCard").hidden = false;

@@ -241,10 +241,21 @@ tr.head:first-child td {
 }
 
 .aircraft {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin: 0 0 14px;
   font-family: ui-monospace, monospace;
+}
+
+#operator {
   font-size: 15px;
   font-weight: 600;
+}
+
+#reg {
+  font-size: 12px;
+  color: #888;
 }
 
 .note {
