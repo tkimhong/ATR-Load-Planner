@@ -21,6 +21,7 @@ const COLS = [
 const $ = (id) => document.getElementById(id);
 
 let ofp = null;
+let ofpText = null;
 let inputs = {};
 
 function saveState() {
@@ -31,6 +32,7 @@ function saveState() {
         pirep: $("pirep").value,
         prev: $("prevArr").value,
         ofp,
+        ofpText,
       }),
     );
   } catch {}
@@ -44,6 +46,7 @@ function loadState() {
     if (saved.pirep) $("pirep").value = saved.pirep;
     if (saved.prev) $("prevArr").value = saved.prev;
     if (saved.ofp) ofp = saved.ofp;
+    if (saved.ofpText) ofpText = saved.ofpText;
 
     return !!saved.pirep;
   } catch {
@@ -63,6 +66,7 @@ function clearAll() {
   $("note").textContent = "";
   $("prevValue").textContent = "";
   ofp = null;
+  ofpText = null;
   inputs = {};
   setStatus("");
 }
@@ -102,6 +106,8 @@ async function fetchOFP(skipBuild) {
       reg: data.aircraft?.reg || "",
       callsign: data.atc?.callsign || "",
     };
+
+    ofpText = $("pirep").value;
 
     setStatus(
       `OFP ${ofp.reg} ${ofp.dep}-${ofp.arr}, ${ofp.ramp} kg ramp`,
@@ -212,7 +218,7 @@ async function build() {
   const text = $("pirep").value;
   if (!text.trim()) return setStatus("Paste the PIREP block first", "bad");
 
-  if (!ofp && $("simbriefId").value.trim()) await fetchOFP(true);
+  if (text !== ofpText && $("simbriefId").value.trim()) await fetchOFP(true);
 
   const p = parsePIREP(text);
   const fuel = p.fuel || {};
