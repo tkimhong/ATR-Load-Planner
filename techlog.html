@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ATR tech log</title>
+    <title>Tech log</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <main>
-      <h1>ATR tech log</h1>
+      <h1>Tech log</h1>
       <p class="sub"><a href="./">load planner</a> · tech log</p>
 
       <section>
@@ -73,7 +73,14 @@
 
         <div class="row actions">
           <button id="copyBtn" onclick="copyRow()">Copy row</button>
-          <a href="#" onclick="clearAll(); return false">Clear</a>
+          <a
+            href="#"
+            onclick="
+              clearAll();
+              return false;
+            "
+            >Clear</a
+          >
         </div>
         <pre id="preview"></pre>
       </section>

@@ -39,6 +39,7 @@ and the one tab-separated row is ready to be copied.
 - The operator code and registration are shown at the top, so you know which
   aircraft's sheet you are filling
 - The row survives a refresh; **Clear** starts a new day
+- Works for either type in the fleet - it only reads the PIREP and your sheet columns
 
 ## Limits
 

@@ -74,7 +74,7 @@ function setStatus(msg, tone) {
   el.className = "status" + (tone ? " " + tone : "");
 }
 
-async function fetchOFP() {
+async function fetchOFP(skipBuild) {
   const id = $("simbriefId").value.trim();
   if (!id) return setStatus("Enter your SimBrief user ID", "bad");
 
@@ -107,7 +107,7 @@ async function fetchOFP() {
       `OFP ${ofp.reg} ${ofp.dep}-${ofp.arr}, ${ofp.ramp} kg ramp`,
       "ok",
     );
-    if ($("pirep").value.trim()) build();
+    if (!skipBuild && $("pirep").value.trim()) build();
   } catch (e) {
     setStatus(e.message || "Could not reach SimBrief", "bad");
   }
@@ -208,9 +208,11 @@ function applyPrev() {
   if (dep) inputs.uplift.value = String(Math.max(0, dep - prev));
 }
 
-function build() {
+async function build() {
   const text = $("pirep").value;
   if (!text.trim()) return setStatus("Paste the PIREP block first", "bad");
+
+  if (!ofp && $("simbriefId").value.trim()) await fetchOFP(true);
 
   const p = parsePIREP(text);
   const fuel = p.fuel || {};
